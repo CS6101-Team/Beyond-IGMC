@@ -143,6 +143,10 @@ parser.add_argument('--ratio', type=float, default=1.0,
                     help="For ml datasets, if ratio < 1, downsample training data to the\
                     target ratio")
 
+# Choose Model
+
+parser.add_argument('--model-type', default='IGMC', help = 'Specify Model used (default is IGMC)')
+
 
 '''
     Set seeds, prepare for transfer learning (if --transfer)
@@ -386,6 +390,74 @@ if False:
         with open(os.path.join(args.res_dir, 'cmd_input.txt'), 'a') as f:
             f.write(' --k ' + str(model.k) + '\n')
             print('k is saved.')
+
+# SageConv Model
+# Same params as IGMC
+elif args.model_type == 'SageConvIGMC':
+    if args.transfer:
+        num_relations = args.num_relations
+        multiply_by = args.multiply_by
+    else:
+        num_relations = len(class_values)
+        multiply_by = 1
+    model = SageConvIGMC(
+        train_graphs, 
+        latent_dim=[32, 32, 32, 32], 
+        num_relations=num_relations, 
+        num_bases=4, 
+        regression=True, 
+        adj_dropout=args.adj_dropout, 
+        force_undirected=args.force_undirected, 
+        side_features=args.use_features, 
+        n_side_features=n_features, 
+        multiply_by=multiply_by
+    )
+
+# MaxPoolIGMC Model (RGCNConv)
+# Same params as IGMC
+elif args.model_type == 'MaxPoolIGMC':
+    if args.transfer:
+        num_relations = args.num_relations
+        multiply_by = args.multiply_by
+    else:
+        num_relations = len(class_values)
+        multiply_by = 1
+    model = MaxPoolIGMC(
+        train_graphs, 
+        latent_dim=[32, 32, 32, 32], 
+        num_relations=num_relations, 
+        num_bases=4, 
+        regression=True, 
+        adj_dropout=args.adj_dropout, 
+        force_undirected=args.force_undirected, 
+        side_features=args.use_features, 
+        n_side_features=n_features, 
+        multiply_by=multiply_by
+    )
+
+# LSTMAttention Model (RGCNConv)
+# Same params as IGMC
+elif args.model_type == 'MaxPoolIGMC':
+    if args.transfer:
+        num_relations = args.num_relations
+        multiply_by = args.multiply_by
+    else:
+        num_relations = len(class_values)
+        multiply_by = 1
+    model = LSTMAttentionIGMC(
+        train_graphs, 
+        latent_dim=[32, 32, 32, 32], 
+        num_relations=num_relations, 
+        num_bases=4, 
+        regression=True, 
+        adj_dropout=args.adj_dropout, 
+        force_undirected=args.force_undirected, 
+        side_features=args.use_features, 
+        n_side_features=n_features, 
+        multiply_by=multiply_by
+    )
+
+# Default is IGMC
 else:
     # IGMC GNN model (default)
     if args.transfer:

@@ -3,7 +3,7 @@ import math
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import Linear, Conv1d
-from torch_geometric.nn import GCNConv, RGCNConv, global_sort_pool, global_add_pool
+from torch_geometric.nn import GCNConv, RGCNConv, SAGEConv, global_sort_pool, global_add_pool, global_max_pool
 from torch_geometric.utils import dropout_adj
 from util_functions import *
 import pdb
@@ -215,3 +215,162 @@ class IGMC(GNN):
             return x[:, 0] * self.multiply_by
         else:
             return F.log_softmax(x, dim=-1)
+
+# Replace RGCNConv with SageConv
+
+class SageConvIGMC(GNN):
+    # The GNN model of Inductive Graph-based Matrix Completion. 
+    # Use RGCN convolution + center-nodes readout.
+    def __init__(self, dataset, gconv=SAGEConv, latent_dim=[32, 32, 32, 32], 
+                 num_relations=5, num_bases=2, regression=False, adj_dropout=0.2, 
+                 force_undirected=False, side_features=False, n_side_features=0, 
+                 multiply_by=1):
+        super(IGMC, self).__init__(
+            dataset, GCNConv, latent_dim, regression, adj_dropout, force_undirected
+        )
+        self.multiply_by = multiply_by
+        self.convs = torch.nn.ModuleList()
+        self.convs.append(gconv(dataset.num_features, latent_dim[0], num_relations, num_bases))
+        for i in range(0, len(latent_dim)-1):
+            self.convs.append(gconv(latent_dim[i], latent_dim[i+1], num_relations, num_bases))
+        self.lin1 = Linear(2*sum(latent_dim), 128)
+        self.side_features = side_features
+        if side_features:
+            self.lin1 = Linear(2*sum(latent_dim)+n_side_features, 128)
+
+    def forward(self, data):
+        start = time.time()
+        x, edge_index, edge_type, batch = data.x, data.edge_index, data.edge_type, data.batch
+        if self.adj_dropout > 0:
+            edge_index, edge_type = dropout_adj(
+                edge_index, edge_type, p=self.adj_dropout, 
+                force_undirected=self.force_undirected, num_nodes=len(x), 
+                training=self.training
+            )
+        concat_states = []
+        for conv in self.convs:
+            x = torch.tanh(conv(x, edge_index, edge_type))
+            concat_states.append(x)
+        concat_states = torch.cat(concat_states, 1)
+
+        users = data.x[:, 0] == 1
+        items = data.x[:, 1] == 1
+        x = torch.cat([concat_states[users], concat_states[items]], 1)
+        if self.side_features:
+            x = torch.cat([x, data.u_feature, data.v_feature], 1)
+
+        x = F.relu(self.lin1(x))
+        x = F.dropout(x, p=0.5, training=self.training)
+        x = self.lin2(x)
+        if self.regression:
+            return x[:, 0] * self.multiply_by
+        else:
+            return F.log_softmax(x, dim=-1)
+
+# MaxPool instead of Concat
+
+class MaxPoolIGMC(GNN):
+    # The GNN model of Inductive Graph-based Matrix Completion. 
+    # Use RGCN convolution + center-nodes readout.
+    def __init__(self, dataset, gconv=RGCNConv, latent_dim=[32, 32, 32, 32], 
+                 num_relations=5, num_bases=2, regression=False, adj_dropout=0.2, 
+                 force_undirected=False, side_features=False, n_side_features=0, 
+                 multiply_by=1):
+        super(IGMC, self).__init__(
+            dataset, GCNConv, latent_dim, regression, adj_dropout, force_undirected
+        )
+        self.multiply_by = multiply_by
+        self.convs = torch.nn.ModuleList()
+        self.convs.append(gconv(dataset.num_features, latent_dim[0], num_relations, num_bases))
+        for i in range(0, len(latent_dim)-1):
+            self.convs.append(gconv(latent_dim[i], latent_dim[i+1], num_relations, num_bases))
+        self.lin1 = Linear(2*sum(latent_dim), 128)
+        self.side_features = side_features
+        if side_features:
+            self.lin1 = Linear(2*sum(latent_dim)+n_side_features, 128)
+
+    def forward(self, data):
+        start = time.time()
+        x, edge_index, edge_type, batch = data.x, data.edge_index, data.edge_type, data.batch
+        if self.adj_dropout > 0:
+            edge_index, edge_type = dropout_adj(
+                edge_index, edge_type, p=self.adj_dropout, 
+                force_undirected=self.force_undirected, num_nodes=len(x), 
+                training=self.training
+            )
+        concat_states = []
+        for conv in self.convs:
+            x = torch.tanh(conv(x, edge_index, edge_type))
+            concat_states.append(x)
+        concat_states = torch.cat(concat_states, 1)
+        users = data.x[:, 0] == 1
+        items = data.x[:, 1] == 1
+        x = torch.cat([concat_states[users], concat_states[items]], 1)
+        x = global_max_pool(x, batch)
+        x = F.relu(self.lin1(x))
+        x = F.dropout(x, p=0.5, training=self.training)
+        x = self.lin2(x)
+        if self.regression:
+            return x[:, 0]
+        else:
+            return F.log_softmax(x, dim=-1)
+
+# LSTM Attention Aggregation IGMC
+
+class LSTMAttentionIGMC(GNN):
+    # The GNN model of Inductive Graph-based Matrix Completion. 
+    # Use RGCN convolution + center-nodes readout.
+    def __init__(self, dataset, gconv=RGCNConv, latent_dim=[32, 32, 32, 32], 
+                 num_relations=5, num_bases=2, regression=False, adj_dropout=0.2, 
+                 force_undirected=False, side_features=False, n_side_features=0, 
+                 multiply_by=1, input_size = 32, hidden_size = 32, dropout = 0.5):
+        super(IGMC, self).__init__(
+            dataset, GCNConv, latent_dim, regression, adj_dropout, force_undirected
+        )
+        self.multiply_by = multiply_by
+        self.convs = torch.nn.ModuleList()
+        self.convs.append(gconv(dataset.num_features, latent_dim[0], num_relations, num_bases))
+        for i in range(0, len(latent_dim)-1):
+            self.convs.append(gconv(latent_dim[i], latent_dim[i+1], num_relations, num_bases))
+        self.lin1 = Linear(2*sum(latent_dim), 128)
+        self.side_features = side_features
+        if side_features:
+            self.lin1 = Linear(2*sum(latent_dim)+n_side_features, 128)
+
+        self.input_dim = 32
+        self.hidden_dim = 32
+        self.n_layers = 1
+        self.dropout = 0.5
+        
+        self.bi_lstm = torch.nn.LSTM(input_size=self.input_size, hidden_size=self.hidden_size,
+         num_layers=self.n_layers, batch_first=False, dropout=self.dropout, bidirectional=True)
+
+    def forward(self, data):
+        start = time.time()
+        x, edge_index, edge_type, batch = data.x, data.edge_index, data.edge_type, data.batch
+        if self.adj_dropout > 0:
+            edge_index, edge_type = dropout_adj(
+                edge_index, edge_type, p=self.adj_dropout, 
+                force_undirected=self.force_undirected, num_nodes=len(x), 
+                training=self.training
+            )
+        concat_states = []
+        for conv in self.convs:
+            x = torch.tanh(conv(x, edge_index, edge_type))
+            concat_states.append(x)
+        concat_states = torch.stack(concat_states, 1)
+        concat_states, _ = self.bi_lstm(concat_states)
+
+        users = data.x[:, 0] == 1
+        items = data.x[:, 1] == 1
+        x = torch.cat([concat_states[users], concat_states[items]], 1)
+        if self.side_features:
+            x = torch.cat([x, data.u_feature, data.v_feature], 1)
+
+        x = F.relu(self.lin1(x))
+        x = F.dropout(x, p=0.5, training=self.training)
+        x = self.lin2(x)
+        if self.regression:
+            return x[:, 0] * self.multiply_by
+        else:
+            return F.log_softmax(x, dim=-1)       
