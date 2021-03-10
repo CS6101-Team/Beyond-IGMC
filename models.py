@@ -235,12 +235,16 @@ class GraphNorm(nn.Module):
         self.mean_scale = nn.Parameter(torch.ones(latent_dim))
 
     def forward(self, x, batch):
-        batch_size = len(batch)
-        batch_list = torch.Tensor(batch).long().to(x.device)
-        batch_index = torch.arange(batch_size).to(x.device).repeat_interleave(batch_list)
+        batch_size = batch[-1]+1
+        batch_list = [0] * batch_size
+        for i in range(len(batch)):
+            batch_list[batch[i]] += 1
+        batch_list = torch.Tensor(batch_list).long().to(x.device)
+
+        batch_index = batch.view((-1,) + (1,) * (x.dim() - 1)).expand_as(x)
 
         mean = torch.zeros(batch_size, *x.shape[1:]).to(x.device)
-        mean = mean.scater_add(0, batch_index, x)
+        mean = mean.scatter_add(0, batch_index, x)
         mean = (mean.T / batch_list).T
         mean = mean.repeat_interleave(batch_list, dim=0)
 
