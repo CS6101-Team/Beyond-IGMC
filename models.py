@@ -178,10 +178,17 @@ class IGMC(GNN):
             dataset, GCNConv, latent_dim, regression, adj_dropout, force_undirected
         )
         self.multiply_by = multiply_by
+        #convolutions
         self.convs = torch.nn.ModuleList()
         self.convs.append(gconv(dataset.num_features, latent_dim[0], num_relations, num_bases))
         for i in range(0, len(latent_dim)-1):
             self.convs.append(gconv(latent_dim[i], latent_dim[i+1], num_relations, num_bases))
+
+        #norms
+        self.norms = torch.nn.ModuleList()
+        for i in range(len(latent_dim)):
+            self.norms.append(GraphNorm(latent_dim[i]))
+
         self.lin1 = Linear(2*sum(latent_dim), 128)
         self.side_features = side_features
         if side_features:
@@ -197,9 +204,13 @@ class IGMC(GNN):
                 training=self.training
             )
         concat_states = []
-        for conv in self.convs:
-            x = torch.tanh(conv(x, edge_index, edge_type))
+
+        for i in range(len(self.convs)):
+            x = self.convs[i](x, edge_index, edge_type)
+            x = self.norms[i](x, batch)
+            x = torch.tanh(x)
             concat_states.append(x)
+
         concat_states = torch.cat(concat_states, 1)
 
         users = data.x[:, 0] == 1
@@ -215,3 +226,28 @@ class IGMC(GNN):
             return x[:, 0] * self.multiply_by
         else:
             return F.log_softmax(x, dim=-1)
+
+class GraphNorm(nn.Module):
+    def __init__(self, latent_dim):
+        super().__init__()
+        self.weight = nn.Parameter(torch.ones(latent_dim))
+        self.bias = nn.Parameter(torch.zeros(latent_dim))
+        self.mean_scale = nn.Parameter(torch.ones(latent_dim))
+
+    def forward(self, x, batch):
+        batch_size = len(batch)
+        batch_list = torch.Tensor(batch).long().to(x.device)
+        batch_index = torch.arange(batch_size).to(x.device).repeat_interleave(batch_list)
+
+        mean = torch.zeros(batch_size, *x.shape[1:]).to(x.device)
+        mean = mean.scater_add(0, batch_index, x)
+        mean = (mean.T / batch_list).T
+        mean = mean.repeat_interleave(batch_list, dim=0)
+
+        sub = x - mean * self.mean_scale
+
+        std = torch.zeros(batch_size, *x.shape[1:]).to(x.device)
+        std = std.scatter_add_(0, batch_index, sub.pow(2))
+        std = ((std.T / batch_list).T + 1e-6).sqrt()
+        std = std.repeat_interleave(batch_list, dim=0)
+        return self.weight * sub / std + self.bias
