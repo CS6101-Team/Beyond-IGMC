@@ -428,7 +428,7 @@ if args.visualize:
         args.res_dir, 
         args.data_name, 
         class_values, 
-        sort_by='prediction'
+        sort_by='difference' #change sort condition
     )
     if args.transfer:
         rmse = test_once(test_graphs, model, args.batch_size, logger)

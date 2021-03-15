@@ -245,7 +245,7 @@ def eval_rmse_ensemble(model, checkpoints, loader, device, show_progress=False):
     return rmse
 
 
-def visualize(model, graphs, res_dir, data_name, class_values, num=5, sort_by='prediction'):
+def visualize(model, graphs, res_dir, data_name, class_values, num=5, sort_by='difference'):
     model.eval()
     model.to(device)
     R = []
@@ -261,6 +261,8 @@ def visualize(model, graphs, res_dir, data_name, class_values, num=5, sort_by='p
         order = np.argsort(Y).tolist()
     elif sort_by == 'prediction':
         order = np.argsort(R).tolist()
+    elif sort_by == 'difference': #sort by RMSE
+        order = np.argsort(Y-R).tolist()
     elif sort_by == 'random':  # randomly select graphs to visualize
         order = np.random.permutation(range(len(R))).tolist()
     highest = [PyGGraph_to_nx(graphs[i]) for i in order[-num:][::-1]]
