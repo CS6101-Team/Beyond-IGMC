@@ -394,6 +394,8 @@ if False:
 # SageConv Model
 # Same params as IGMC
 elif args.model_type == 'SageConvIGMC':
+    print('Model is SageConvIGMC')
+
     if args.transfer:
         num_relations = args.num_relations
         multiply_by = args.multiply_by
@@ -416,6 +418,9 @@ elif args.model_type == 'SageConvIGMC':
 # MaxPoolIGMC Model (RGCNConv)
 # Same params as IGMC
 elif args.model_type == 'MaxPoolIGMC':
+
+    print('Model is MaxPoolIGMC')
+
     if args.transfer:
         num_relations = args.num_relations
         multiply_by = args.multiply_by
@@ -437,7 +442,10 @@ elif args.model_type == 'MaxPoolIGMC':
 
 # LSTMAttention Model (RGCNConv)
 # Same params as IGMC
-elif args.model_type == 'MaxPoolIGMC':
+elif args.model_type == 'LSTMAttentionIGMC':
+
+    print('Model is LSTMAttentionIGMC')
+
     if args.transfer:
         num_relations = args.num_relations
         multiply_by = args.multiply_by
@@ -459,6 +467,9 @@ elif args.model_type == 'MaxPoolIGMC':
 
 # Default is IGMC
 else:
+
+    print('Model is IGMC')
+
     # IGMC GNN model (default)
     if args.transfer:
         num_relations = args.num_relations

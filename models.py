@@ -190,6 +190,11 @@ class IGMC(GNN):
     def forward(self, data):
         start = time.time()
         x, edge_index, edge_type, batch = data.x, data.edge_index, data.edge_type, data.batch
+
+        # print('\n\n')
+        # print('1x:')
+        # print(list(x.shape))
+
         if self.adj_dropout > 0:
             edge_index, edge_type = dropout_adj(
                 edge_index, edge_type, p=self.adj_dropout, 
@@ -197,23 +202,54 @@ class IGMC(GNN):
                 training=self.training
             )
         concat_states = []
+        # print('2x:')
         for conv in self.convs:
             x = torch.tanh(conv(x, edge_index, edge_type))
+            # print(list(x.shape))
             concat_states.append(x)
         concat_states = torch.cat(concat_states, 1)
+        # print('1concat:')
+        # print(list(concat_states.shape))
 
         users = data.x[:, 0] == 1
         items = data.x[:, 1] == 1
+        # print('users')
+        # print(list(users.shape))
+        # print(list(concat_states[users].shape))
+        # print('items')
+        # print(list(items.shape))
+        # print(list(concat_states[items].shape))
         x = torch.cat([concat_states[users], concat_states[items]], 1)
+        # print('3x:')
+        # print(list(x.shape))
         if self.side_features:
             x = torch.cat([x, data.u_feature, data.v_feature], 1)
 
+        # print('4x:')
+        # print(list(x.shape))
+
         x = F.relu(self.lin1(x))
+
+        # print('5x:')
+        # print(list(x.shape))
+
         x = F.dropout(x, p=0.5, training=self.training)
+
+        # print('6x:')
+        # print(list(x.shape))
+
         x = self.lin2(x)
+
+        # print('7x:')
+        # print(list(x.shape))
+
         if self.regression:
+            # print('8a:')
+            # print(list((x[:, 0] * self.multiply_by).shape))
             return x[:, 0] * self.multiply_by
         else:
+            # print('8b:')
+            # print(list((F.log_softmax(x, dim=-1)).shape))
             return F.log_softmax(x, dim=-1)
 
 # Replace RGCNConv with SageConv
@@ -225,8 +261,8 @@ class SageConvIGMC(GNN):
                  num_relations=5, num_bases=2, regression=False, adj_dropout=0.2, 
                  force_undirected=False, side_features=False, n_side_features=0, 
                  multiply_by=1):
-        super(IGMC, self).__init__(
-            dataset, GCNConv, latent_dim, regression, adj_dropout, force_undirected
+        super(SageConvIGMC, self).__init__(
+            dataset, SAGEConv, latent_dim, regression, adj_dropout, force_undirected
         )
         self.multiply_by = multiply_by
         self.convs = torch.nn.ModuleList()
@@ -276,7 +312,7 @@ class MaxPoolIGMC(GNN):
                  num_relations=5, num_bases=2, regression=False, adj_dropout=0.2, 
                  force_undirected=False, side_features=False, n_side_features=0, 
                  multiply_by=1):
-        super(IGMC, self).__init__(
+        super(MaxPoolIGMC, self).__init__(
             dataset, GCNConv, latent_dim, regression, adj_dropout, force_undirected
         )
         self.multiply_by = multiply_by
@@ -284,7 +320,8 @@ class MaxPoolIGMC(GNN):
         self.convs.append(gconv(dataset.num_features, latent_dim[0], num_relations, num_bases))
         for i in range(0, len(latent_dim)-1):
             self.convs.append(gconv(latent_dim[i], latent_dim[i+1], num_relations, num_bases))
-        self.lin1 = Linear(2*sum(latent_dim), 128)
+        # self.lin1 = Linear(2*sum(latent_dim), 128)
+        self.lin1 = Linear(sum(latent_dim), 32)
         self.side_features = side_features
         if side_features:
             self.lin1 = Linear(2*sum(latent_dim)+n_side_features, 128)
@@ -292,6 +329,7 @@ class MaxPoolIGMC(GNN):
     def forward(self, data):
         start = time.time()
         x, edge_index, edge_type, batch = data.x, data.edge_index, data.edge_type, data.batch
+
         if self.adj_dropout > 0:
             edge_index, edge_type = dropout_adj(
                 edge_index, edge_type, p=self.adj_dropout, 
@@ -302,10 +340,11 @@ class MaxPoolIGMC(GNN):
         for conv in self.convs:
             x = torch.tanh(conv(x, edge_index, edge_type))
             concat_states.append(x)
-        concat_states = torch.cat(concat_states, 1)
-        users = data.x[:, 0] == 1
-        items = data.x[:, 1] == 1
-        x = torch.cat([concat_states[users], concat_states[items]], 1)
+        # concat_states = torch.cat(concat_states, 1)
+        # users = data.x[:, 0] == 1
+        # items = data.x[:, 1] == 1
+        # x = torch.cat([concat_states[users], concat_states[items]], 1)
+        
         x = global_max_pool(x, batch)
         x = F.relu(self.lin1(x))
         x = F.dropout(x, p=0.5, training=self.training)
@@ -324,7 +363,7 @@ class LSTMAttentionIGMC(GNN):
                  num_relations=5, num_bases=2, regression=False, adj_dropout=0.2, 
                  force_undirected=False, side_features=False, n_side_features=0, 
                  multiply_by=1, input_size = 32, hidden_size = 32, dropout = 0.5):
-        super(IGMC, self).__init__(
+        super(LSTMAttentionIGMC, self).__init__(
             dataset, GCNConv, latent_dim, regression, adj_dropout, force_undirected
         )
         self.multiply_by = multiply_by
@@ -336,18 +375,23 @@ class LSTMAttentionIGMC(GNN):
         self.side_features = side_features
         if side_features:
             self.lin1 = Linear(2*sum(latent_dim)+n_side_features, 128)
-
-        self.input_dim = 32
-        self.hidden_dim = 32
-        self.n_layers = 1
-        self.dropout = 0.5
         
-        self.bi_lstm = torch.nn.LSTM(input_size=self.input_size, hidden_size=self.hidden_size,
-         num_layers=self.n_layers, batch_first=False, dropout=self.dropout, bidirectional=True)
+        self.hidden_size = 16
+        self.bi_lstm = torch.nn.LSTM(input_size = 32, hidden_size = self.hidden_size, bidirectional = True)
+        self.lin3 = Linear(32, 1).cuda()
+        self.softmax = torch.nn.Softmax(dim = 0)
+        self.num_layers = len(latent_dim)
+
 
     def forward(self, data):
+
         start = time.time()
         x, edge_index, edge_type, batch = data.x, data.edge_index, data.edge_type, data.batch
+
+        # print('\n\n')
+        # print('1x:')
+        # print(list(x.shape))
+
         if self.adj_dropout > 0:
             edge_index, edge_type = dropout_adj(
                 edge_index, edge_type, p=self.adj_dropout, 
@@ -355,22 +399,95 @@ class LSTMAttentionIGMC(GNN):
                 training=self.training
             )
         concat_states = []
+        # print('2x:')
         for conv in self.convs:
             x = torch.tanh(conv(x, edge_index, edge_type))
+            # print(list(x.shape))
             concat_states.append(x)
-        concat_states = torch.stack(concat_states, 1)
-        concat_states, _ = self.bi_lstm(concat_states)
+        x = torch.stack(concat_states, 0)
+        # print('3x:')
+        # print(list(x.shape))
+
+        # Bi LSTM
+
+        output, _ = self.bi_lstm(x)
+        # print('1output:')
+        # print(list(output.shape))
+        batch_size = list(output.shape)[1]
+        # # Reference: https://stackoverflow.com/questions/50856936/taking-the-last-state-from-bilstm-bigru-in-pytorch/50914946
+        output = output.view(self.num_layers, batch_size, 2, self.hidden_size)   # (seq_len, batch_size, num_directions, hidden_size)
+        output_forward = output[:, :, 0, :]   # (seq_len, batch_size, hidden_size)
+        output_backward = output[:, :, 1, :]
+        output_concatenated = torch.cat([output_forward, output_backward], dim = 2)
+        # print('2(output, output_forward, output_backward, output_concatenated):')
+        # print(list(output.shape))
+        # print(list(output_forward.shape))
+        # print(list(output_backward.shape))
+        # print(list(output_concatenated.shape))
+
+        # Dense + Softmax
+        # Reshape
+        dense_input = output_concatenated.permute((1, 0, 2))
+        dense_output = self.lin3(dense_input)
+        # Average across 0th dimension
+        dense_output = torch.mean(dense_output, dim = 0).reshape((self.num_layers, ))
+
+        # print('1Dense:')
+        # print(list(dense_input.shape))
+        # print(list(dense_output.shape))
+
+        # print('1Softmax:')
+        softmax_output = self.softmax(dense_output)
+        # print(softmax_output)
+
+        # Multiply weights to concat_states
+        concat_states = [concat_states[i] * softmax_output[i] for i in range(self.num_layers)]
+
+        # The rest is the same as IGMC
+
+        concat_states = torch.cat(concat_states, 1)
+        # print('1concat:')
+        # print(list(concat_states.shape))
 
         users = data.x[:, 0] == 1
         items = data.x[:, 1] == 1
+        # print('users')
+        # print(list(users.shape))
+        # print(list(concat_states[users].shape))
+        # print('items')
+        # print(list(items.shape))
+        # print(list(concat_states[items].shape))
         x = torch.cat([concat_states[users], concat_states[items]], 1)
+        # print('4x:')
+        # print(list(x.shape))
         if self.side_features:
             x = torch.cat([x, data.u_feature, data.v_feature], 1)
 
+        # print('5x:')
+        # print(list(x.shape))
+
         x = F.relu(self.lin1(x))
+
+        # print('6x:')
+        # print(list(x.shape))
+
         x = F.dropout(x, p=0.5, training=self.training)
+
+        # print('7x:')
+        # print(list(x.shape))
+
         x = self.lin2(x)
+
+        # print('8x:')
+        # print(list(x.shape))
+
         if self.regression:
+            # print('9a:')
+            # print(list((x[:, 0] * self.multiply_by).shape))
             return x[:, 0] * self.multiply_by
         else:
-            return F.log_softmax(x, dim=-1)       
+            # print('9b:')
+            # print(list((F.log_softmax(x, dim=-1)).shape))
+            return F.log_softmax(x, dim=-1)
+
+     
