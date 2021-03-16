@@ -245,7 +245,7 @@ def eval_rmse_ensemble(model, checkpoints, loader, device, show_progress=False):
     return rmse
 
 
-def visualize(model, graphs, res_dir, data_name, class_values, num=5, sort_by='difference'):
+def visualize(model, graphs, res_dir, data_name, class_values, num=10, sort_by='difference'): #changed number of visualizations to 10
     model.eval()
     model.to(device)
     R = []
