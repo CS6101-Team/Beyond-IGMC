@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from collections import Counter
 
 class GraphNorm(nn.Module):
     def __init__(self, latent_dim):
@@ -10,9 +11,8 @@ class GraphNorm(nn.Module):
 
     def forward(self, x, batch):
         batch_size = batch[-1]+1
-        batch_list = [0] * batch_size
-        for i in range(len(batch)):
-            batch_list[batch[i]] += 1
+        counter_dict = Counter(batch.tolist())
+        batch_list = [y[1] for y in sorted(list(counter_dict.items()), key = lambda x: x[0])]
         batch_list = torch.Tensor(batch_list).long().to(x.device)
 
         batch_index = batch.view((-1,) + (1,) * (x.dim() - 1)).expand_as(x)
