@@ -9,6 +9,8 @@ from util_functions import *
 import pdb
 import time
 
+from graphnorm import GraphNorm
+
 
 class GNN(torch.nn.Module):
     # a base GNN class, GCN message passing + sum_pooling
@@ -173,15 +175,24 @@ class IGMC(GNN):
     def __init__(self, dataset, gconv=RGCNConv, latent_dim=[32, 32, 32, 32], 
                  num_relations=5, num_bases=2, regression=False, adj_dropout=0.2, 
                  force_undirected=False, side_features=False, n_side_features=0, 
-                 multiply_by=1):
+                 multiply_by=1, use_graphnorm=False):
         super(IGMC, self).__init__(
             dataset, GCNConv, latent_dim, regression, adj_dropout, force_undirected
         )
         self.multiply_by = multiply_by
+        #convolutions
         self.convs = torch.nn.ModuleList()
         self.convs.append(gconv(dataset.num_features, latent_dim[0], num_relations, num_bases))
         for i in range(0, len(latent_dim)-1):
             self.convs.append(gconv(latent_dim[i], latent_dim[i+1], num_relations, num_bases))
+
+        #norms
+        self.use_graphnorm = use_graphnorm
+        if use_graphnorm:
+            self.norms = torch.nn.ModuleList()
+            for i in range(len(latent_dim)):
+                self.norms.append(GraphNorm(latent_dim[i]))
+
         self.lin1 = Linear(2*sum(latent_dim), 128)
         self.side_features = side_features
         if side_features:
@@ -197,9 +208,14 @@ class IGMC(GNN):
                 training=self.training
             )
         concat_states = []
-        for conv in self.convs:
-            x = torch.tanh(conv(x, edge_index, edge_type))
+
+        for i in range(len(self.convs)):
+            x = self.convs[i](x, edge_index, edge_type)
+            if self.use_graphnorm:
+                x = self.norms[i](x, batch)
+            x = torch.tanh(x)
             concat_states.append(x)
+
         concat_states = torch.cat(concat_states, 1)
 
         users = data.x[:, 0] == 1
