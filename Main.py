@@ -144,7 +144,7 @@ parser.add_argument('--ratio', type=float, default=1.0,
                     target ratio")
 
 #custom additions
-parser.add_argument('--use-graphnorm', default=False, help = 'Specify if model should use GraphNorm')
+parser.add_argument('--use-graphnorm', action='store_true', default=False, help = 'Specify if model should use GraphNorm')
 
 '''
     Set seeds, prepare for transfer learning (if --transfer)
