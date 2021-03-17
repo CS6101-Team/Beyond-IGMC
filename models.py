@@ -252,57 +252,6 @@ class IGMC(GNN):
             # print(list((F.log_softmax(x, dim=-1)).shape))
             return F.log_softmax(x, dim=-1)
 
-# Replace RGCNConv with SageConv
-
-class SageConvIGMC(GNN):
-    # The GNN model of Inductive Graph-based Matrix Completion. 
-    # Use RGCN convolution + center-nodes readout.
-    def __init__(self, dataset, gconv=SAGEConv, latent_dim=[32, 32, 32, 32], 
-                 num_relations=5, num_bases=2, regression=False, adj_dropout=0.2, 
-                 force_undirected=False, side_features=False, n_side_features=0, 
-                 multiply_by=1):
-        super(SageConvIGMC, self).__init__(
-            dataset, SAGEConv, latent_dim, regression, adj_dropout, force_undirected
-        )
-        self.multiply_by = multiply_by
-        self.convs = torch.nn.ModuleList()
-        self.convs.append(gconv(dataset.num_features, latent_dim[0], num_relations, num_bases))
-        for i in range(0, len(latent_dim)-1):
-            self.convs.append(gconv(latent_dim[i], latent_dim[i+1], num_relations, num_bases))
-        self.lin1 = Linear(2*sum(latent_dim), 128)
-        self.side_features = side_features
-        if side_features:
-            self.lin1 = Linear(2*sum(latent_dim)+n_side_features, 128)
-
-    def forward(self, data):
-        start = time.time()
-        x, edge_index, edge_type, batch = data.x, data.edge_index, data.edge_type, data.batch
-        if self.adj_dropout > 0:
-            edge_index, edge_type = dropout_adj(
-                edge_index, edge_type, p=self.adj_dropout, 
-                force_undirected=self.force_undirected, num_nodes=len(x), 
-                training=self.training
-            )
-        concat_states = []
-        for conv in self.convs:
-            x = torch.tanh(conv(x, edge_index, edge_type))
-            concat_states.append(x)
-        concat_states = torch.cat(concat_states, 1)
-
-        users = data.x[:, 0] == 1
-        items = data.x[:, 1] == 1
-        x = torch.cat([concat_states[users], concat_states[items]], 1)
-        if self.side_features:
-            x = torch.cat([x, data.u_feature, data.v_feature], 1)
-
-        x = F.relu(self.lin1(x))
-        x = F.dropout(x, p=0.5, training=self.training)
-        x = self.lin2(x)
-        if self.regression:
-            return x[:, 0] * self.multiply_by
-        else:
-            return F.log_softmax(x, dim=-1)
-
 # MaxPool instead of Concat
 
 class MaxPoolIGMC(GNN):
@@ -320,15 +269,19 @@ class MaxPoolIGMC(GNN):
         self.convs.append(gconv(dataset.num_features, latent_dim[0], num_relations, num_bases))
         for i in range(0, len(latent_dim)-1):
             self.convs.append(gconv(latent_dim[i], latent_dim[i+1], num_relations, num_bases))
-        # self.lin1 = Linear(2*sum(latent_dim), 128)
-        self.lin1 = Linear(sum(latent_dim), 32)
+        self.lin1 = Linear(int(2*sum(latent_dim) / 4), 128)
         self.side_features = side_features
         if side_features:
-            self.lin1 = Linear(2*sum(latent_dim)+n_side_features, 128)
+            self.lin1 = Linear((2*sum(latent_dim)+n_side_features) / 4, 128)
+        self.maxpool1d = nn.MaxPool1d(4)
 
     def forward(self, data):
         start = time.time()
         x, edge_index, edge_type, batch = data.x, data.edge_index, data.edge_type, data.batch
+
+        # print('\n\n')
+        # print('1x:')
+        # print(list(x.shape))
 
         if self.adj_dropout > 0:
             edge_index, edge_type = dropout_adj(
@@ -337,21 +290,64 @@ class MaxPoolIGMC(GNN):
                 training=self.training
             )
         concat_states = []
+        # print('2x:')
         for conv in self.convs:
             x = torch.tanh(conv(x, edge_index, edge_type))
+            # print(list(x.shape))
             concat_states.append(x)
-        # concat_states = torch.cat(concat_states, 1)
-        # users = data.x[:, 0] == 1
-        # items = data.x[:, 1] == 1
-        # x = torch.cat([concat_states[users], concat_states[items]], 1)
-        
-        x = global_max_pool(x, batch)
+
+        x = torch.stack(concat_states, 2)
+        # print('3x:')
+        # print(list(x.shape))
+
+        x = self.maxpool1d(x)
+        # print('4x:')
+        # print(list(x.shape))
+
+        maxpool_states = x.squeeze(-1)
+        # print('5x:')
+        # print(list(maxpool_states.shape))
+
+        users = data.x[:, 0] == 1
+        items = data.x[:, 1] == 1
+        # print('users')
+        # print(list(users.shape))
+        # print(list(maxpool_states[users].shape))
+        # print('items')
+        # print(list(items.shape))
+        # print(list(maxpool_states[items].shape))
+        x = torch.cat([maxpool_states[users], maxpool_states[items]], 1)
+        # print('6x:')
+        # print(list(x.shape))
+
+        if self.side_features:
+            x = torch.cat([x, data.u_feature, data.v_feature], 1)
+
+        # print('7x:')
+        # print(list(x.shape))
+
         x = F.relu(self.lin1(x))
+
+        # print('8x:')
+        # print(list(x.shape))
+
         x = F.dropout(x, p=0.5, training=self.training)
+
+        # print('9x:')
+        # print(list(x.shape))
+
         x = self.lin2(x)
+
+        # print('10x:')
+        # print(list(x.shape))
+
         if self.regression:
-            return x[:, 0]
+            # print('11a:')
+            # print(list((x[:, 0] * self.multiply_by).shape))
+            return x[:, 0] * self.multiply_by
         else:
+            # print('11b:')
+            # print(list((F.log_softmax(x, dim=-1)).shape))
             return F.log_softmax(x, dim=-1)
 
 # LSTM Attention Aggregation IGMC

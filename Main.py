@@ -391,29 +391,29 @@ if False:
             f.write(' --k ' + str(model.k) + '\n')
             print('k is saved.')
 
-# SageConv Model
-# Same params as IGMC
-elif args.model_type == 'SageConvIGMC':
-    print('Model is SageConvIGMC')
+# # SageConv Model
+# # Same params as IGMC
+# elif args.model_type == 'SageConvIGMC':
+#     print('Model is SageConvIGMC')
 
-    if args.transfer:
-        num_relations = args.num_relations
-        multiply_by = args.multiply_by
-    else:
-        num_relations = len(class_values)
-        multiply_by = 1
-    model = SageConvIGMC(
-        train_graphs, 
-        latent_dim=[32, 32, 32, 32], 
-        num_relations=num_relations, 
-        num_bases=4, 
-        regression=True, 
-        adj_dropout=args.adj_dropout, 
-        force_undirected=args.force_undirected, 
-        side_features=args.use_features, 
-        n_side_features=n_features, 
-        multiply_by=multiply_by
-    )
+#     if args.transfer:
+#         num_relations = args.num_relations
+#         multiply_by = args.multiply_by
+#     else:
+#         num_relations = len(class_values)
+#         multiply_by = 1
+#     model = SageConvIGMC(
+#         train_graphs, 
+#         latent_dim=[32, 32, 32, 32], 
+#         num_relations=num_relations, 
+#         num_bases=4, 
+#         regression=True, 
+#         adj_dropout=args.adj_dropout, 
+#         force_undirected=args.force_undirected, 
+#         side_features=args.use_features, 
+#         n_side_features=n_features, 
+#         multiply_by=multiply_by
+#     )
 
 # MaxPoolIGMC Model (RGCNConv)
 # Same params as IGMC
