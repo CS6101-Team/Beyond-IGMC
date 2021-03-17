@@ -9,6 +9,8 @@ from util_functions import *
 import pdb
 import time
 
+from graphnorm import GraphNorm
+
 
 class GNN(torch.nn.Module):
     # a base GNN class, GCN message passing + sum_pooling
@@ -173,7 +175,7 @@ class IGMC(GNN):
     def __init__(self, dataset, gconv=RGCNConv, latent_dim=[32, 32, 32, 32], 
                  num_relations=5, num_bases=2, regression=False, adj_dropout=0.2, 
                  force_undirected=False, side_features=False, n_side_features=0, 
-                 multiply_by=1):
+                 multiply_by=1, use_graphnorm=False):
         super(IGMC, self).__init__(
             dataset, GCNConv, latent_dim, regression, adj_dropout, force_undirected
         )
@@ -185,9 +187,11 @@ class IGMC(GNN):
             self.convs.append(gconv(latent_dim[i], latent_dim[i+1], num_relations, num_bases))
 
         #norms
-        self.norms = torch.nn.ModuleList()
-        for i in range(len(latent_dim)):
-            self.norms.append(GraphNorm(latent_dim[i]))
+        self.use_graphnorm = use_graphnorm
+        if use_graphnorm:
+            self.norms = torch.nn.ModuleList()
+            for i in range(len(latent_dim)):
+                self.norms.append(GraphNorm(latent_dim[i]))
 
         self.lin1 = Linear(2*sum(latent_dim), 128)
         self.side_features = side_features
@@ -207,7 +211,8 @@ class IGMC(GNN):
 
         for i in range(len(self.convs)):
             x = self.convs[i](x, edge_index, edge_type)
-            x = self.norms[i](x, batch)
+            if self.use_graphnorm:
+                x = self.norms[i](x, batch)
             x = torch.tanh(x)
             concat_states.append(x)
 
@@ -226,32 +231,3 @@ class IGMC(GNN):
             return x[:, 0] * self.multiply_by
         else:
             return F.log_softmax(x, dim=-1)
-
-class GraphNorm(nn.Module):
-    def __init__(self, latent_dim):
-        super().__init__()
-        self.weight = nn.Parameter(torch.ones(latent_dim))
-        self.bias = nn.Parameter(torch.zeros(latent_dim))
-        self.mean_scale = nn.Parameter(torch.ones(latent_dim))
-
-    def forward(self, x, batch):
-        batch_size = batch[-1]+1
-        batch_list = [0] * batch_size
-        for i in range(len(batch)):
-            batch_list[batch[i]] += 1
-        batch_list = torch.Tensor(batch_list).long().to(x.device)
-
-        batch_index = batch.view((-1,) + (1,) * (x.dim() - 1)).expand_as(x)
-
-        mean = torch.zeros(batch_size, *x.shape[1:]).to(x.device)
-        mean = mean.scatter_add(0, batch_index, x)
-        mean = (mean.T / batch_list).T
-        mean = mean.repeat_interleave(batch_list, dim=0)
-
-        sub = x - mean * self.mean_scale
-
-        std = torch.zeros(batch_size, *x.shape[1:]).to(x.device)
-        std = std.scatter_add_(0, batch_index, sub.pow(2))
-        std = ((std.T / batch_list).T + 1e-6).sqrt()
-        std = std.repeat_interleave(batch_list, dim=0)
-        return self.weight * sub / std + self.bias

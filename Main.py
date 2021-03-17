@@ -135,6 +135,8 @@ parser.add_argument('--ratio', type=float, default=1.0,
                     help="For ml datasets, if ratio < 1, downsample training data to the\
                     target ratio")
 
+#custom additions
+parser.add_argument('--use-graphnorm', default=False, help = 'Specify if model should use GraphNorm')
 
 '''
     Set seeds, prepare for transfer learning (if --transfer)
@@ -396,7 +398,8 @@ else:
         force_undirected=args.force_undirected, 
         side_features=args.use_features, 
         n_side_features=n_features, 
-        multiply_by=multiply_by
+        multiply_by=multiply_by,
+        use_graphnorm=args.use_graphnorm
     )
     total_params = sum(p.numel() for param in model.parameters() for p in param)
     print(f'Total number of parameters is {total_params}')
