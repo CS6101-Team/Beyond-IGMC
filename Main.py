@@ -150,7 +150,7 @@ parser.add_argument('--use-graphnorm', action='store_true', default=False, help 
 parser.add_argument('--model-type', default='IGMC', help = 'Specify Model used (default is IGMC)')
 
 # Choose gconv type
-parser.add_argument('--gconv-type', default='GCNConv', help = 'Specify Model used (default is IGMC)')
+parser.add_argument('--gconv-type', default='GCNConv', help = 'Specify gconv used (default is GCNConv)')
 
 '''
     Set seeds, prepare for transfer learning (if --transfer)
