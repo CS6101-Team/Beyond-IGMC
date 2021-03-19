@@ -414,7 +414,8 @@ model = IGMC(
     n_side_features=n_features, 
     multiply_by=multiply_by,
     use_graphnorm=args.use_graphnorm,
-    model_type=args.model_type
+    model_type=args.model_type,
+    gconv_type=args.gconv_type
 )
 total_params = sum(p.numel() for param in model.parameters() for p in param)
 print(f'Total number of parameters is {total_params}')
