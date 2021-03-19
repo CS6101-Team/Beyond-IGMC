@@ -3,7 +3,7 @@ import math
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import Linear, Conv1d
-from torch_geometric.nn import GCNConv, RGCNConv, global_sort_pool, global_add_pool,SAGEConv
+from torch_geometric.nn import GCNConv, RGCNConv, SAGEConv, global_sort_pool, global_add_pool
 from torch_geometric.utils import dropout_adj
 from util_functions import *
 import pdb
@@ -14,7 +14,7 @@ from graphnorm import GraphNorm
 
 class GNN(torch.nn.Module):
     # a base GNN class, GCN message passing + sum_pooling
-    def __init__(self, dataset, gconv=SAGEConv, latent_dim=[32, 32, 32, 1],
+    def __init__(self, dataset, gconv=GCNConv, latent_dim=[32, 32, 32, 1], 
                  regression=False, adj_dropout=0.2, force_undirected=False):
         super(GNN, self).__init__()
         self.regression = regression
@@ -64,7 +64,7 @@ class GNN(torch.nn.Module):
 
 class DGCNN(GNN):
     # DGCNN from [Zhang et al. AAAI 2018], GCN message passing + SortPooling
-    def __init__(self, dataset, gconv=SAGEConv, latent_dim=[32, 32, 32, 1], k=30,
+    def __init__(self, dataset, gconv=GCNConv, latent_dim=[32, 32, 32, 1], k=30, 
                  regression=False, adj_dropout=0.2, force_undirected=False):
         super(DGCNN, self).__init__(
             dataset, gconv, latent_dim, regression, adj_dropout, force_undirected
@@ -124,12 +124,12 @@ class DGCNN(GNN):
 
 class DGCNN_RS(DGCNN):
     # A DGCNN model using RGCN convolution to take consideration of edge types.
-    def __init__(self, dataset, gconv=RGCNConv, latent_dim=[32, 32, 32, 1], k=30,
+    def __init__(self, dataset, gconv=RGCNConv, latent_dim=[32, 32, 32, 1], k=30, 
                  num_relations=5, num_bases=2, regression=False, adj_dropout=0.2, 
                  force_undirected=False):
         super(DGCNN_RS, self).__init__(
             dataset, 
-            SAGEConv,
+            GCNConv, 
             latent_dim, 
             k, 
             regression, 
@@ -172,13 +172,22 @@ class DGCNN_RS(DGCNN):
 class IGMC(GNN):
     # The GNN model of Inductive Graph-based Matrix Completion. 
     # Use RGCN convolution + center-nodes readout.
-    def __init__(self, dataset, gconv=RGCNConv, latent_dim=[32, 32, 32, 32], 
+    def __init__(self, dataset, gconv=GCNConv, latent_dim=[32, 32, 32, 32], 
                  num_relations=5, num_bases=2, regression=False, adj_dropout=0.2, 
                  force_undirected=False, side_features=False, n_side_features=0, 
-                 multiply_by=1, use_graphnorm=False):
-        super(IGMC, self).__init__(
-            dataset, SAGEConv, latent_dim, regression, adj_dropout, force_undirected
-        )
+                 multiply_by=1, use_graphnorm=False, model_type = 'IGMC', gconv_type = 'GCNConv'):
+
+        if gconv_type == 'SAGEConv':
+            super(IGMC, self).__init__(
+                dataset, SAGEConv, latent_dim, regression, adj_dropout, force_undirected
+            )
+        
+        # Default: GCNConv
+        else:
+            super(IGMC, self).__init__(
+                dataset, GCNConv, latent_dim, regression, adj_dropout, force_undirected
+            )
+
         self.multiply_by = multiply_by
         #convolutions
         self.convs = torch.nn.ModuleList()
@@ -188,15 +197,28 @@ class IGMC(GNN):
 
         #norms
         self.use_graphnorm = use_graphnorm
+        self.model_type = model_type
         if use_graphnorm:
             self.norms = torch.nn.ModuleList()
             for i in range(len(latent_dim)):
                 self.norms.append(GraphNorm(latent_dim[i]))
 
-        self.lin1 = Linear(2*sum(latent_dim), 128)
+        if model_type == 'MaxPoolIGMC':
+            self.lin1 = Linear(int(2*sum(latent_dim)/4), 128)
+        else:
+            self.lin1 = Linear(2*sum(latent_dim), 128)
+        
         self.side_features = side_features
+
         if side_features:
             self.lin1 = Linear(2*sum(latent_dim)+n_side_features, 128)
+
+        #LSTM Attention params
+        self.hidden_size = 16
+        self.bi_lstm = torch.nn.LSTM(input_size = 32, hidden_size = self.hidden_size, bidirectional = True)
+        self.lin3 = Linear(32, 1).cuda()
+        self.softmax = torch.nn.Softmax(dim = 0)
+        self.num_layers = len(latent_dim)
 
     def forward(self, data):
         start = time.time()
@@ -207,20 +229,49 @@ class IGMC(GNN):
                 force_undirected=self.force_undirected, num_nodes=len(x), 
                 training=self.training
             )
-        concat_states = []
+        states = []
 
         for i in range(len(self.convs)):
             x = self.convs[i](x, edge_index, edge_type)
             if self.use_graphnorm:
                 x = self.norms[i](x, batch)
             x = torch.tanh(x)
-            concat_states.append(x)
+            states.append(x)
+        
+        if self.model_type == 'MaxPoolIGMC':
+            x = torch.stack(states, 2)
+            x = self.maxpool1d(x)
+            states = x.squeeze(-1)
 
-        concat_states = torch.cat(concat_states, 1)
+        elif self.model_type == 'LSTMAttentionIGMC':
+            x = torch.stack(states, 0)
+            #Bi-lstm
+            output, _ = self.bi_lstm(x)
+            batch_size = list(output.shape)[1]
+            output = output.view(self.num_layers, batch_size, 2, self.hidden_size)   # (seq_len, batch_size, num_directions, hidden_size)
+            output_forward = output[:, :, 0, :]   # (seq_len, batch_size, hidden_size)
+            output_backward = output[:, :, 1, :]
+            output_concatenated = torch.cat([output_forward, output_backward], dim = 2)
+            # Attention
+            # Reshape
+            dense_input = output_concatenated.permute((1, 0, 2))
+            # Dense
+            dense_output = self.lin3(dense_input)
+            # Average across 0th dimension
+            dense_output = torch.mean(dense_output, dim = 0).reshape((self.num_layers, ))
+            # Softmax
+            softmax_output = self.softmax(dense_output)
+            # Multiply weights to states
+            states = [states[i] * softmax_output[i] for i in range(self.num_layers)]
+
+        # Default is IGMC
+        else:
+            states = torch.cat(states, 1)
 
         users = data.x[:, 0] == 1
         items = data.x[:, 1] == 1
-        x = torch.cat([concat_states[users], concat_states[items]], 1)
+        x = torch.cat([states[users], states[items]], 1)
+
         if self.side_features:
             x = torch.cat([x, data.u_feature, data.v_feature], 1)
 
