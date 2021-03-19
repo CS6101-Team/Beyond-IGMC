@@ -143,14 +143,10 @@ parser.add_argument('--ratio', type=float, default=1.0,
                     help="For ml datasets, if ratio < 1, downsample training data to the\
                     target ratio")
 
-#custom additions
-parser.add_argument('--use-graphnorm', action='store_true', default=False, help = 'Specify if model should use GraphNorm')
-
 # Choose Model
+
 parser.add_argument('--model-type', default='IGMC', help = 'Specify Model used (default is IGMC)')
 
-# Choose gconv type
-parser.add_argument('--gconv-type', default='GCNConv', help = 'Specify gconv used (default is GCNConv)')
 
 '''
     Set seeds, prepare for transfer learning (if --transfer)
@@ -377,47 +373,124 @@ print('Used #train graphs: %d, #test graphs: %d' % (
 '''
     Train and apply the GNN model
 '''
-# if False:
-#     # DGCNN_RS GNN model
-#     model = DGCNN_RS(
+if False:
+    # DGCNN_RS GNN model
+    model = DGCNN_RS(
+        train_graphs, 
+        latent_dim=[32, 32, 32, 1], 
+        k=0.6, 
+        num_relations=len(class_values), 
+        num_bases=4, 
+        regression=True, 
+        adj_dropout=args.adj_dropout, 
+        force_undirected=args.force_undirected
+    )
+    # record the k used in sortpooling
+    if not args.transfer:
+        with open(os.path.join(args.res_dir, 'cmd_input.txt'), 'a') as f:
+            f.write(' --k ' + str(model.k) + '\n')
+            print('k is saved.')
+
+# # SageConv Model
+# # Same params as IGMC
+# elif args.model_type == 'SageConvIGMC':
+#     print('Model is SageConvIGMC')
+
+#     if args.transfer:
+#         num_relations = args.num_relations
+#         multiply_by = args.multiply_by
+#     else:
+#         num_relations = len(class_values)
+#         multiply_by = 1
+#     model = SageConvIGMC(
 #         train_graphs, 
-#         latent_dim=[32, 32, 32, 1], 
-#         k=0.6, 
-#         num_relations=len(class_values), 
+#         latent_dim=[32, 32, 32, 32], 
+#         num_relations=num_relations, 
 #         num_bases=4, 
 #         regression=True, 
 #         adj_dropout=args.adj_dropout, 
-#         force_undirected=args.force_undirected
+#         force_undirected=args.force_undirected, 
+#         side_features=args.use_features, 
+#         n_side_features=n_features, 
+#         multiply_by=multiply_by
 #     )
-#     # record the k used in sortpooling
-#     if not args.transfer:
-#         with open(os.path.join(args.res_dir, 'cmd_input.txt'), 'a') as f:
-#             f.write(' --k ' + str(model.k) + '\n')
-#             print('k is saved.')
 
-# IGMC GNN model (default)
-if args.transfer:
-    num_relations = args.num_relations
-    multiply_by = args.multiply_by
+# MaxPoolIGMC Model (RGCNConv)
+# Same params as IGMC
+elif args.model_type == 'MaxPoolIGMC':
+
+    print('Model is MaxPoolIGMC')
+
+    if args.transfer:
+        num_relations = args.num_relations
+        multiply_by = args.multiply_by
+    else:
+        num_relations = len(class_values)
+        multiply_by = 1
+    model = MaxPoolIGMC(
+        train_graphs, 
+        latent_dim=[32, 32, 32, 32], 
+        num_relations=num_relations, 
+        num_bases=4, 
+        regression=True, 
+        adj_dropout=args.adj_dropout, 
+        force_undirected=args.force_undirected, 
+        side_features=args.use_features, 
+        n_side_features=n_features, 
+        multiply_by=multiply_by
+    )
+
+# LSTMAttention Model (RGCNConv)
+# Same params as IGMC
+elif args.model_type == 'LSTMAttentionIGMC':
+
+    print('Model is LSTMAttentionIGMC')
+
+    if args.transfer:
+        num_relations = args.num_relations
+        multiply_by = args.multiply_by
+    else:
+        num_relations = len(class_values)
+        multiply_by = 1
+    model = LSTMAttentionIGMC(
+        train_graphs, 
+        latent_dim=[32, 32, 32, 32], 
+        num_relations=num_relations, 
+        num_bases=4, 
+        regression=True, 
+        adj_dropout=args.adj_dropout, 
+        force_undirected=args.force_undirected, 
+        side_features=args.use_features, 
+        n_side_features=n_features, 
+        multiply_by=multiply_by
+    )
+
+# Default is IGMC
 else:
-    num_relations = len(class_values)
-    multiply_by = 1
-model = IGMC(
-    train_graphs, 
-    latent_dim=[32, 32, 32, 32], 
-    num_relations=num_relations, 
-    num_bases=4, 
-    regression=True, 
-    adj_dropout=args.adj_dropout, 
-    force_undirected=args.force_undirected, 
-    side_features=args.use_features, 
-    n_side_features=n_features, 
-    multiply_by=multiply_by,
-    use_graphnorm=args.use_graphnorm,
-    model_type=args.model_type
-)
-total_params = sum(p.numel() for param in model.parameters() for p in param)
-print(f'Total number of parameters is {total_params}')
+
+    print('Model is IGMC')
+
+    # IGMC GNN model (default)
+    if args.transfer:
+        num_relations = args.num_relations
+        multiply_by = args.multiply_by
+    else:
+        num_relations = len(class_values)
+        multiply_by = 1
+    model = IGMC(
+        train_graphs, 
+        latent_dim=[32, 32, 32, 32], 
+        num_relations=num_relations, 
+        num_bases=4, 
+        regression=True, 
+        adj_dropout=args.adj_dropout, 
+        force_undirected=args.force_undirected, 
+        side_features=args.use_features, 
+        n_side_features=n_features, 
+        multiply_by=multiply_by
+    )
+    total_params = sum(p.numel() for param in model.parameters() for p in param)
+    print(f'Total number of parameters is {total_params}')
     
 
 if not args.no_train:
