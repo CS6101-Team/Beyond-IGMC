@@ -77,7 +77,7 @@ def train_multiple_epochs(train_dataset,
         train_loss = train(model, optimizer, train_loader, device, regression=True, ARR=ARR, 
                            show_progress=batch_pbar, epoch=epoch)
         if epoch % test_freq == 0:
-            rmses.append(eval_rmse(model, test_loader, device, show_progress=batch_pbar))
+            rmses.append(eval_rmse(model, test_loader, device, show_progress=batch_pbar)[0])
         else:
             rmses.append(np.nan)
         eval_info = {
@@ -123,9 +123,9 @@ def test_once(test_dataset,
     model.to(device)
     t_start = time.perf_counter()
     if ensemble and checkpoints:
-        rmse = eval_rmse_ensemble(model, checkpoints, test_loader, device, show_progress=True)
+        rmse, preds = eval_rmse_ensemble(model, checkpoints, test_loader, device, show_progress=True)
     else:
-        rmse = eval_rmse(model, test_loader, device, show_progress=True)
+        rmse, preds = eval_rmse(model, test_loader, device, show_progress=True)
     t_end = time.perf_counter()
     duration = t_end - t_start
     print('Test Once RMSE: {:.6f}, Duration: {:.6f}'.format(rmse, duration))
@@ -137,7 +137,7 @@ def test_once(test_dataset,
         }
     if logger is not None:
         logger(eval_info, None, None)
-    return rmse
+    return rmse, preds
 
 
 def num_graphs(data):
@@ -186,6 +186,7 @@ def train(model, optimizer, loader, device, regression=False, ARR=0,
 def eval_loss(model, loader, device, regression=False, show_progress=False):
     model.eval()
     loss = 0
+    outs = []
     if show_progress:
         print('Testing begins...')
         pbar = tqdm(loader)
@@ -195,18 +196,20 @@ def eval_loss(model, loader, device, regression=False, show_progress=False):
         data = data.to(device)
         with torch.no_grad():
             out = model(data)
+            outs.append(out)
         if regression:
             loss += F.mse_loss(out, data.y.view(-1), reduction='sum').item()
         else:
             loss += F.nll_loss(out, data.y.view(-1), reduction='sum').item()
         torch.cuda.empty_cache()
-    return loss / len(loader.dataset)
+    outs = torch.cat(outs, 0).view(-1, 1)
+    return (loss / len(loader.dataset), outs.cpu().numpy())
 
 
 def eval_rmse(model, loader, device, show_progress=False):
-    mse_loss = eval_loss(model, loader, device, True, show_progress)
+    mse_loss, preds = eval_loss(model, loader, device, True, show_progress)
     rmse = math.sqrt(mse_loss)
-    return rmse
+    return rmse, preds
 
 
 def eval_loss_ensemble(model, checkpoints, loader, device, regression=False, show_progress=False):
@@ -240,13 +243,13 @@ def eval_loss_ensemble(model, checkpoints, loader, device, regression=False, sho
     else:
         loss += F.nll_loss(Outs, ys, reduction='sum').item()
     torch.cuda.empty_cache()
-    return loss / len(loader.dataset)
+    return (loss / len(loader.dataset), Outs.cpu().numpy()) 
 
 
 def eval_rmse_ensemble(model, checkpoints, loader, device, show_progress=False):
-    mse_loss = eval_loss_ensemble(model, checkpoints, loader, device, True, show_progress)
+    mse_loss, preds = eval_loss_ensemble(model, checkpoints, loader, device, True, show_progress)
     rmse = math.sqrt(mse_loss)
-    return rmse
+    return rmse, preds
 
 
 def visualize(model, graphs, res_dir, data_name, class_values, num=5, sort_by='prediction'):
