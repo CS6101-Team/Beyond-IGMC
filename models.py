@@ -204,6 +204,7 @@ class IGMC(GNN):
                 self.norms.append(GraphNorm(latent_dim[i]))
 
         if model_type == 'MaxPoolIGMC':
+            self.maxpool1d = nn.MaxPool1d(4)
             self.lin1 = Linear(int(2*sum(latent_dim)/4), 128)
         else:
             self.lin1 = Linear(2*sum(latent_dim), 128)
@@ -263,6 +264,8 @@ class IGMC(GNN):
             softmax_output = self.softmax(dense_output)
             # Multiply weights to states
             states = [states[i] * softmax_output[i] for i in range(self.num_layers)]
+            # Concat states
+            states = torch.cat(states, 1)
 
         # Default is IGMC
         else:
