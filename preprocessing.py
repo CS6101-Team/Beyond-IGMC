@@ -38,6 +38,7 @@ def load_matlab_file(path_file, name_field):
     warning:
         '.mat' files should be saved in the '-v7.3' format
     """
+    print(path_file)
     db = h5py.File(path_file, 'r')
     ds = db[name_field]
     try:
@@ -232,6 +233,9 @@ def load_data_monti(dataset, testing=False, rating_map=None, post_rating_map=Non
         Wcol = load_matlab_file(path_dataset, 'W_tracks')
         u_features = np.eye(num_users)
         v_features = Wcol
+    else:
+        u_features = None
+        v_features = None
 
     u_nodes_ratings = np.where(M)[0]
     v_nodes_ratings = np.where(M)[1]

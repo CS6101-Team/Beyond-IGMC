@@ -31,7 +31,7 @@ warnings.showwarning = warn_with_traceback
 
 def logger(info, model, optimizer, timetaken=0):
     epoch, train_loss, test_rmse = info['epoch'], info['train_loss'], info['test_rmse']
-    filename= os.path.join(args.res_dir, 'log.csv')
+    filename= os.path.join(args.res_dir, f'{args.fname}-log.csv')
     file_exists = os.path.isfile(filename)
     with open(filename, 'a') as f:
         headers = ['Epoch', 'Train', "Test", "Time"]
@@ -43,9 +43,9 @@ def logger(info, model, optimizer, timetaken=0):
         #     epoch, train_loss, test_rmse))
     if type(epoch) == int and epoch % args.save_interval == 0:
         print('Saving model states...')
-        model_name = os.path.join(args.res_dir, 'model_checkpoint{}.pth'.format(epoch))
+        model_name = os.path.join(args.res_dir, '{}-model_checkpoint{}.pth'.format(args.fname, epoch))
         optimizer_name = os.path.join(
-            args.res_dir, 'optimizer_checkpoint{}.pth'.format(epoch)
+            args.res_dir, '{}optimizer_checkpoint{}.pth'.format(args.fname, epoch)
         )
         if model is not None:
             torch.save(model.state_dict(), model_name)
@@ -152,6 +152,7 @@ parser.add_argument('--model-type', default='IGMC', help = 'Specify Model used (
 # Choose gconv type
 parser.add_argument('--gconv-type', default='GCNConv', help = 'Specify gconv used (default is GCNConv)')
 
+parser.add_argument('--fname', type=str ,action='store', default = 'igmc-1', help = 'Define file name of saved weights, checkpoints and optimizer ')
 '''
     Set seeds, prepare for transfer learning (if --transfer)
 '''
@@ -241,7 +242,7 @@ elif args.use_features:
 else:
     datasplit_path = 'raw_data/' + args.data_name + '/nofeatures.pickle'
 
-if args.data_name in ['flixster', 'douban', 'yahoo_music']:
+if args.data_name in ['flixster', 'douban', 'yahoo_music', 'amazon_fashion']:
     (
         u_features, v_features, adj_train, train_labels, train_u_indices, train_v_indices,
         val_labels, val_u_indices, val_v_indices, test_labels, test_u_indices, 
