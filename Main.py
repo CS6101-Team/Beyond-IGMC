@@ -45,7 +45,7 @@ def logger(info, model, optimizer, timetaken=0):
         print('Saving model states...')
         model_name = os.path.join(args.res_dir, '{}-model_checkpoint{}.pth'.format(args.fname, epoch))
         optimizer_name = os.path.join(
-            args.res_dir, '{}optimizer_checkpoint{}.pth'.format(args.fname, epoch)
+            args.res_dir, '{}-optimizer_checkpoint{}.pth'.format(args.fname, epoch)
         )
         if model is not None:
             torch.save(model.state_dict(), model_name)
@@ -470,7 +470,7 @@ else:
             )
         else:
             checkpoints = [
-                os.path.join(args.res_dir, 'model_checkpoint%d.pth' %x) 
+                os.path.join(args.res_dir, f'{args.fname}-model_checkpoint%d.pth' %x) 
                 for x in range(start_epoch, end_epoch+1, interval)
             ]
             epoch_info = 'ensemble of range({}, {}, {})'.format(
