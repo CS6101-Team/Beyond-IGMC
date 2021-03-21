@@ -172,7 +172,7 @@ class DGCNN_RS(DGCNN):
 class IGMC(GNN):
     # The GNN model of Inductive Graph-based Matrix Completion. 
     # Use RGCN convolution + center-nodes readout.
-    def __init__(self, dataset, gconv=GCNConv, latent_dim=[32, 32, 32, 32], 
+    def __init__(self, dataset, gconv=RGCNConv, latent_dim=[32, 32, 32, 32], 
                  num_relations=5, num_bases=2, regression=False, adj_dropout=0.2, 
                  force_undirected=False, side_features=False, n_side_features=0, 
                  multiply_by=1, use_graphnorm=False, model_type = 'IGMC', gconv_type = 'GCNConv'):

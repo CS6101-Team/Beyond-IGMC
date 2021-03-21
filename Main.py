@@ -152,6 +152,7 @@ parser.add_argument('--model-type', default='IGMC', help = 'Specify Model used (
 # Choose gconv type
 parser.add_argument('--gconv-type', default='GCNConv', help = 'Specify gconv used (default is GCNConv)')
 
+# Specify file name
 parser.add_argument('--fname', type=str ,action='store', default = 'igmc-1', help = 'Define file name of saved weights, checkpoints and optimizer ')
 '''
     Set seeds, prepare for transfer learning (if --transfer)
