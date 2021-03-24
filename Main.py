@@ -267,7 +267,7 @@ else:
         args.data_name, 1234, args.testing, datasplit_path, True, True, rating_map, 
         post_rating_map, args.ratio
     )
-
+            
 print('All ratings are:')
 print(class_values)
 '''
@@ -452,7 +452,7 @@ if args.visualize:
         sort_by='prediction'
     )
     if args.transfer:
-        rmse = test_once(test_graphs, model, args.batch_size, logger)
+        rmse, preds = test_once(test_graphs, model, args.batch_size, logger)
         print('Transfer learning rmse is: {:.6f}'.format(rmse))
 else:
     if args.ensemble:
@@ -476,7 +476,7 @@ else:
             epoch_info = 'ensemble of range({}, {}, {})'.format(
                 start_epoch, end_epoch, interval
             )
-        rmse = test_once(
+        rmse, preds = test_once(
             test_graphs, 
             model, 
             args.batch_size, 
@@ -488,7 +488,7 @@ else:
     else:
         if args.transfer:
             model.load_state_dict(torch.load(args.model_pos))
-            rmse = test_once(test_graphs, model, args.batch_size, logger=None)
+            rmse, preds = test_once(test_graphs, model, args.batch_size, logger=None)
             epoch_info = 'transfer {}, epoch {}'.format(args.transfer, args.epoch)
         print('Test rmse is: {:.6f}'.format(rmse))
 
@@ -499,5 +499,8 @@ else:
     }
     logger(eval_info, None, None)
 
+    results_df = pd.DataFrame({"u_idx": test_u_indices, "v_idx": test_v_indices,
+    "actual": np.take(class_values, test_labels), "pred": preds})
 
+    results_df.to_csv(os.path.join(args.res_dir, f'{args.fname}-tabular_results.csv'), index=False)
 
