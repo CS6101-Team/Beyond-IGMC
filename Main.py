@@ -395,16 +395,18 @@ else:
         num_relations = len(class_values)
         multiply_by = 1
     model = IGMC(
-        train_graphs, 
-        latent_dim=[32, 32, 32, 32], 
-        num_relations=num_relations, 
-        num_bases=4, 
-        regression=True, 
-        adj_dropout=args.adj_dropout, 
-        force_undirected=args.force_undirected, 
-        side_features=args.use_features, 
-        n_side_features=n_features, 
-        multiply_by=multiply_by
+        train_graphs,
+        input_dim = 3000,
+        latent_dim=[32, 32, 32, 32],
+        num_neighbors_list = [10, 10]
+        # num_relations=num_relations,
+        # num_bases=4,
+        # regression=True,
+        # adj_dropout=args.adj_dropout,
+        # force_undirected=args.force_undirected,
+        # side_features=args.use_features,
+        # n_side_features=n_features,
+        # multiply_by=multiply_by
     )
     total_params = sum(p.numel() for param in model.parameters() for p in param)
     print(f'Total number of parameters is {total_params}')
@@ -485,6 +487,4 @@ else:
         'test_rmse': rmse,
     }
     logger(eval_info, None, None)
-
-
 
