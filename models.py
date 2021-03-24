@@ -66,10 +66,10 @@ class NeighborAggregator(torch.nn.Module):
                  use_bias=False, aggr_method="mean"):
         """聚合节点邻居
         Args:
-            input_dim: 输入特征的维度
-            output_dim: 输出特征的维度
-            use_bias: 是否使用偏置 (default: {False})
-            aggr_method: 邻居聚合方式 (default: {mean})
+            input_dim:
+            output_dim:
+            use_bias: (default: {False})
+            aggr_method: (default: {mean})
         """
         super(NeighborAggregator, self).__init__()
         self.input_dim = input_dim
@@ -116,13 +116,13 @@ class SageGCN(torch.nn.Module):
                  aggr_hidden_method="sum"):
         """SageGCN层定义
         Args:
-            input_dim: 输入特征的维度
-            hidden_dim: 隐层特征的维度，
-                当aggr_hidden_method=sum, 输出维度为hidden_dim
-                当aggr_hidden_method=concat, 输出维度为hidden_dim*2
-            activation: 激活函数
-            aggr_neighbor_method: 邻居特征聚合方法，["mean", "sum", "max"]
-            aggr_hidden_method: 节点特征的更新方法，["sum", "concat"]
+            input_dim:
+            hidden_dim:
+                when: aggr_hidden_method=sum, output: hidden_dim
+                when: aggr_hidden_method=concat, output: hidden_dim*2
+            activation:
+            aggr_neighbor_method: ["mean", "sum", "max"]
+            aggr_hidden_method: ["sum", "concat"]
         """
         super(SageGCN, self).__init__()
         assert aggr_neighbor_method in ["mean", "sum", "max"]
@@ -308,23 +308,21 @@ class DGCNN_RS(DGCNN):
 class IGMC(GraphSage):
     # The GNN model of Inductive Graph-based Matrix Completion. 
     # Use RGCN convolution + center-nodes readout.
-    def __init__(self, dataset, gconv=RGCNConv, latent_dim=[32, 32, 32, 32],
-                 num_relations=5, num_bases=2, regression=False, adj_dropout=0.2,
-                 force_undirected=False, side_features=False, n_side_features=0,
-                 multiply_by=1):
+    def __init__(self, dataset, input_dim, gconv=GraphSage, latent_dim=[32, 32, 32, 1]):
         super(IGMC, self).__init__(
             dataset, GraphSage, latent_dim
         )
         # delete：, regression, adj_dropout, force_undirected (no such parameters in GraphSage)
+        multiply_by = 1
         self.multiply_by = multiply_by
         self.convs = torch.nn.ModuleList()
-        self.convs.append(gconv(dataset.num_features, latent_dim[0], num_relations, num_bases))
+        self.convs.append(gconv(dataset.num_features, latent_dim[0]))
         for i in range(0, len(latent_dim) - 1):
-            self.convs.append(gconv(latent_dim[i], latent_dim[i + 1], num_relations, num_bases))
+            self.convs.append(gconv(latent_dim[i], latent_dim[i + 1]))
         self.lin1 = Linear(2 * sum(latent_dim), 128)
-        self.side_features = side_features
-        if side_features:
-            self.lin1 = Linear(2 * sum(latent_dim) + n_side_features, 128)
+        # self.side_features = side_features
+        # if side_features:
+        #     self.lin1 = Linear(2 * sum(latent_dim) + n_side_features, 128)
 
     def forward(self, data):
         start = time.time()
