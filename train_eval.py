@@ -252,7 +252,7 @@ def eval_rmse_ensemble(model, checkpoints, loader, device, show_progress=False):
     return rmse, preds
 
 
-def visualize(model, graphs, res_dir, data_name, class_values, num=5, sort_by='prediction'):
+def visualize(model, graphs, res_dir, data_name, class_values, num=10, sort_by='rmse'):
     model.eval()
     model.to(device)
     R = []
@@ -270,6 +270,10 @@ def visualize(model, graphs, res_dir, data_name, class_values, num=5, sort_by='p
         order = np.argsort(R).tolist()
     elif sort_by == 'random':  # randomly select graphs to visualize
         order = np.random.permutation(range(len(R))).tolist()
+    elif sort_by == 'rmse':
+        Ynp = np.array(Y)
+        Rnp = np.array(R)
+        order = np.argsort(np.sqrt((Ynp-Rnp)**2))
     highest = [PyGGraph_to_nx(graphs[i]) for i in order[-num:][::-1]]
     lowest = [PyGGraph_to_nx(graphs[i]) for i in order[:num]]
     highest_scores = [R[i] for i in order[-num:][::-1]]
