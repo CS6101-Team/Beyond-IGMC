@@ -243,7 +243,7 @@ elif args.use_features:
 else:
     datasplit_path = 'raw_data/' + args.data_name + '/nofeatures.pickle'
 
-if args.data_name in ['flixster', 'douban', 'yahoo_music', 'amazon_fashion']:
+if args.data_name in ['flixster', 'douban', 'yahoo_music', 'amazon_music']:
     (
         u_features, v_features, adj_train, train_labels, train_u_indices, train_v_indices,
         val_labels, val_u_indices, val_v_indices, test_labels, test_u_indices, 
@@ -462,7 +462,7 @@ else:
             start_epoch, end_epoch, interval = args.epochs-30, args.epochs, 10
         if args.transfer:
             checkpoints = [
-                os.path.join(args.transfer, 'model_checkpoint%d.pth' %x) 
+                os.path.join(args.transfer, f'{args.fname}-model_checkpoint%d.pth' %x) 
                 for x in range(start_epoch, end_epoch+1, interval)
             ]
             epoch_info = 'transfer {}, ensemble of range({}, {}, {})'.format(
