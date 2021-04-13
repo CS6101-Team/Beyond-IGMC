@@ -1,10 +1,10 @@
-Beyond Inductive Graph Matrix Completion
-========================================
+Beyond IGMC
+===========
 <img src="images/diagram.png">
 
 About
 -----
-This codebase refers to our project for the NUS SoC Module, CS6101 - Conversational Recommendation Systems, taken in AY20/21 Sem 2. We investigate how recent advances in Graph Neural Networks can impact and even improve the ability of the state-of-the-art IGMC model, from the following paper: https://openreview.net/pdf?id=ByxxgCEYDS.
+This codebase refers to our project for the NUS SoC Module, CS6101 - Conversational Recommendation Systems, taken in AY20/21 Sem 2. We investigate how recent advances in Graph Neural Networks can impact and even improve the ability of the state-of-the-art Inductive Graph-based Matrix Completion (IGMC) model, from the following paper: https://openreview.net/pdf?id=ByxxgCEYDS.
 
 We contribute 2 main extensions to the model, Graph Normalization, inspired from the following paper: https://arxiv.org/pdf/2009.03294.pdf, and alternative layer aggregation methods, inspired from the following paper: https://arxiv.org/pdf/1806.03536.pdf.
 
