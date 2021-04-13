@@ -1,5 +1,5 @@
-Beyond IGMC
-===========
+Beyond Inductive Graph Matrix Completion
+========================================
 <img src="images/diagram.png">
 
 About
@@ -30,4 +30,5 @@ IGMC: Zhang, M., & Chen, Y. (2019). Inductive matrix completion based on graph n
 Xu, K., Li, C., Tian, Y., Sonobe, T., Kawarabayashi, K. I., & Jegelka, S. (2018, July). Representation learning on graphs with jumping knowledge networks. In International Conference on Machine Learning (pp. 5453-5462). PMLR.
 
 This project is forked from the original IGMC Codebase: https://github.com/muhanzhang/IGMC
+
 GraphNorm code inspired from the original GraphNorm Codebase: https://github.com/lsj2408/GraphNorm
