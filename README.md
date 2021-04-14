@@ -27,6 +27,8 @@ Acknowledgement & Reference
 ----------------------------
 IGMC: Zhang, M., & Chen, Y. (2019). Inductive matrix completion based on graph neural networks. arXiv preprint arXiv:1904.12058.
 
+Cai, T., Luo, S., Xu, K., He, D., Liu, T. Y., & Wang, L. (2020). Graphnorm: A principled approach to accelerating graph neural network training. arXiv preprint arXiv:2009.03294. 
+
 Xu, K., Li, C., Tian, Y., Sonobe, T., Kawarabayashi, K. I., & Jegelka, S. (2018, July). Representation learning on graphs with jumping knowledge networks. In International Conference on Machine Learning (pp. 5453-5462). PMLR.
 
 This project is forked from the original IGMC Codebase: https://github.com/muhanzhang/IGMC
